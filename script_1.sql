@@ -163,7 +163,7 @@ CREATE TABLE [user_roles] (
 );
 
 
-CREATE TABLE [subscriptions_type] (
+CREATE TABLE [subscription_types] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
 	[name] NVARCHAR(255) NOT NULL UNIQUE,
 	[code] NVARCHAR(255) NOT NULL UNIQUE,
@@ -232,7 +232,7 @@ ADD FOREIGN KEY ([customer_id]) REFERENCES [customers]([id]);
 
 -- subscriptions → subscriptions_type
 ALTER TABLE [subscriptions]
-ADD FOREIGN KEY ([subscription_type_id]) REFERENCES [subscriptions_type]([id]);
+ADD FOREIGN KEY ([subscription_type_id]) REFERENCES [subscription_types]([id]);
 
 -- product_attribute_rel → products
 ALTER TABLE [product_attribute_rel]
@@ -323,6 +323,16 @@ VALUES (
     12345678, 1, 1, 1, GETDATE()
 );
 
+-- Tipos suscripciones
+
+INSERT INTO subscriptions_type (name, code, discount_percentage, created_at)
+VALUES ('test1suscripcion', 'CODE1', 0.15, GETDATE());
+
+-- Suscripciones 
+
+INSERT INTO subscriptions (customer_id, subscription_type_id, start_at, end_at, status)
+VALUES (1, 1, GETDATE(), DATEADD(MONTH, 1, GETDATE()), 1);
+
 
 -- Carrito
 
@@ -383,7 +393,7 @@ sub.start_at,
 sub.end_at
 FROM subscriptions sub
 INNER JOIN customers c ON sub.customer_id = c.id
-INNER JOIN subscriptions_type st ON sub.subscription_type_id = st.id
+INNER JOIN subscription_types st ON sub.subscription_type_id = st.id
 WHERE sub.status = 1
 AND sub.end_at >= GETDATE();
 
