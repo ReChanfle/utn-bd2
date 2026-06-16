@@ -1,4 +1,5 @@
 
+
 ----SQL TP----
 CREATE TABLE [products] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
@@ -31,6 +32,7 @@ CREATE TABLE [users] (
 CREATE TABLE [shopping_carts] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
 	[customer_id] BIGINT NOT NULL,
+	[store_id] BIGINT NOT NULL,
 	[status] NVARCHAR(255) NOT NULL,
 	[created_at] DATETIME NOT NULL,
 	[updated_at] DATETIME,
@@ -82,6 +84,7 @@ CREATE TABLE [product_attribute_rel] (
 	[product_attribute_id] BIGINT NOT NULL,
 	PRIMARY KEY([id])
 );
+
 
 CREATE TABLE [product_categories] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
@@ -143,13 +146,16 @@ CREATE TABLE [countries] (
 	PRIMARY KEY([id])
 );
 
+
 CREATE TABLE [sales] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
 	[customer_id] BIGINT,
+	[store_id] BIGINT NOT NULL,
+	[status] NVARCHAR(255) NOT NULL,
 	[shopping_cart_id] BIGINT NOT NULL,
-	[status] NVARCHAR(255),
- 	[total_amount] FLOAT NOT NULL,
+	[total_amount] FLOAT NOT NULL,
 	[created_at] DATETIME NOT NULL,
+	[updated_at] DATETIME NOT NULL,
 	PRIMARY KEY([id])
 );
 
@@ -163,7 +169,7 @@ CREATE TABLE [user_roles] (
 );
 
 
-CREATE TABLE [subscription_types] (
+CREATE TABLE [subscriptions_types] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
 	[name] NVARCHAR(255) NOT NULL UNIQUE,
 	[code] NVARCHAR(255) NOT NULL UNIQUE,
@@ -193,6 +199,7 @@ CREATE TABLE [shopping_carts_items] (
 	[created_at] DATETIME NOT NULL,
 	PRIMARY KEY([id])
 );
+
 
 -- products → products_categories
 ALTER TABLE [products]
@@ -232,7 +239,7 @@ ADD FOREIGN KEY ([customer_id]) REFERENCES [customers]([id]);
 
 -- subscriptions → subscriptions_type
 ALTER TABLE [subscriptions]
-ADD FOREIGN KEY ([subscription_type_id]) REFERENCES [subscription_types]([id]);
+ADD FOREIGN KEY ([subscription_type_id]) REFERENCES [subscriptions_types]([id]);
 
 -- product_attribute_rel → products
 ALTER TABLE [product_attribute_rel]
@@ -290,6 +297,14 @@ ADD FOREIGN KEY ([shopping_cart_id]) REFERENCES [shopping_carts]([id]);
 ALTER TABLE [shopping_carts_items]
 ADD FOREIGN KEY ([product_id]) REFERENCES [products]([id]);
 
+-- Fix fk store id sales -- 
+
+ALTER TABLE [shopping_carts]
+ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id]);
+
+ALTER TABLE [sales]
+ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id]);
+
 ----Valores de prueba----
 
 --Categorias de producto
@@ -307,10 +322,63 @@ VALUES ('Mouse Gamer', 'RGB Pro', 1, 1, GETDATE());
 INSERT INTO product_prices (product_id, price)
 VALUES (1, 1000);
 
+
+-- Pais
+
+INSERT INTO [countries] (
+    [name], 
+    [code], 
+    [created_at]
+)
+VALUES (
+    'Argentina', 
+    'AR',        
+    GETDATE()    
+);
+
+
+--Provincia
+
+INSERT INTO [provinces] (
+    [name], 
+    [code], 
+    [country_id], 
+    [created_at]
+)
+VALUES (
+    'Buenos Aires', 
+    'BUE',          
+    1,              
+    GETDATE()       
+);
+
+
+
+
+-- Tienda
+
+INSERT INTO [stores] (
+    [name], 
+    [code], 
+    [province_id], 
+    [country_id], 
+    [created_at]
+)
+VALUES (
+    'Sucursal Central', 
+    'SUC-001',          
+    1,                 
+    1,                  
+    GETDATE()         
+);
+
 -- Stock inicial 
 
 INSERT INTO product_stocks (product_id, quantity, store_id, created_at)
 VALUES (1, 10, 1, GETDATE());
+
+
+
 
 -- Cliente
 
@@ -325,7 +393,7 @@ VALUES (
 
 -- Tipos suscripciones
 
-INSERT INTO subscriptions_type (name, code, discount_percentage, created_at)
+INSERT INTO subscriptions_types (name, code, discount_percentage, created_at)
 VALUES ('test1suscripcion', 'CODE1', 0.15, GETDATE());
 
 -- Suscripciones 
@@ -336,8 +404,8 @@ VALUES (1, 1, GETDATE(), DATEADD(MONTH, 1, GETDATE()), 1);
 
 -- Carrito
 
-INSERT INTO shopping_carts (customer_id, status, created_at)
-VALUES (1, 'ABIERTO', GETDATE());
+INSERT INTO shopping_carts (customer_id, store_id, status, created_at)
+VALUES (1, 1,'ABIERTO', GETDATE());
 
 -- Producots en carrito
 INSERT INTO shopping_carts_items (
@@ -393,7 +461,7 @@ sub.start_at,
 sub.end_at
 FROM subscriptions sub
 INNER JOIN customers c ON sub.customer_id = c.id
-INNER JOIN subscription_types st ON sub.subscription_type_id = st.id
+INNER JOIN subscriptions_types st ON sub.subscription_type_id = st.id
 WHERE sub.status = 1
 AND sub.end_at >= GETDATE();
 
@@ -403,60 +471,79 @@ AND sub.end_at >= GETDATE();
 --Procedimiento 1 -> generar venta
 
 CREATE PROCEDURE SP_GenerarVentaDesdeCarrito
-@shopping_cart_id BIGINT
+    @shopping_cart_id BIGINT
 AS
 BEGIN
-SET NOCOUNT ON;
+    SET NOCOUNT ON;
 
-BEGIN TRY
-BEGIN TRANSACTION;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-DECLARE @customer_id BIGINT;
-DECLARE @total FLOAT;
+        DECLARE @customer_id BIGINT;
+        DECLARE @store_id BIGINT; -- Variable para almacenar la tienda del carrito
+        DECLARE @total FLOAT;
 
-SELECT @customer_id = customer_id
-FROM shopping_carts
-WHERE id = @shopping_cart_id
-AND status != 'CERRADO';
+        -- 1. Validar que el carrito exista, no esté cerrado, y obtener cliente y tienda
+        SELECT @customer_id = customer_id,
+               @store_id = store_id
+        FROM shopping_carts
+        WHERE id = @shopping_cart_id
+          AND status != 'CERRADO';
 
-IF @customer_id IS NULL
-BEGIN
-RAISERROR('Carrito inexistente o cerrado', 16, 1);
-ROLLBACK;
-RETURN;
-END
+        IF @customer_id IS NULL OR @store_id IS NULL
+        BEGIN
+            RAISERROR('Carrito inexistente, cerrado o sin sucursal asignada', 16, 1);
+            ROLLBACK;
+            RETURN;
+        END
 
-SELECT @total = ISNULL(SUM(quantity * price_at_time), 0)
-FROM shopping_carts_items
-WHERE shopping_cart_id = @shopping_cart_id;
+        -- 2. Calcular el total del carrito
+        SELECT @total = ISNULL(SUM(quantity * price_at_time), 0)
+        FROM shopping_carts_items
+        WHERE shopping_cart_id = @shopping_cart_id;
 
-INSERT INTO sales (customer_id, shopping_cart_id, total_amount, created_at)
-VALUES (@customer_id, @shopping_cart_id, @total, GETDATE());
+        -- 3. Insertar la venta usando el store_id obtenido del carrito
+        INSERT INTO sales (
+            customer_id, 
+            store_id, 
+            shopping_cart_id, 
+            status,
+            total_amount, 
+            created_at,
+            updated_at
+        )
+        VALUES (
+            @customer_id, 
+            @store_id, 
+            @shopping_cart_id, 
+            'PROCESADA', 
+            @total, 
+            GETDATE(),
+            GETDATE()
+        );
 
-DECLARE @sale_id BIGINT = SCOPE_IDENTITY();
+        DECLARE @sale_id BIGINT = SCOPE_IDENTITY();
 
-INSERT INTO sale_items (sale_id, product_id, quantity, price_at_time, created_at)
-SELECT @sale_id, product_id, quantity, price_at_time, GETDATE()
-FROM shopping_carts_items
-WHERE shopping_cart_id = @shopping_cart_id;
+        -- 4. Pasar los items del carrito a los items de la venta
+        INSERT INTO sale_items (sale_id, product_id, quantity, price_at_time, created_at)
+        SELECT @sale_id, product_id, quantity, price_at_time, GETDATE()
+        FROM shopping_carts_items
+        WHERE shopping_cart_id = @shopping_cart_id;
 
-UPDATE shopping_carts
-SET status = 'CERRADO',
-updated_at = GETDATE()
-WHERE id = @shopping_cart_id;
+        -- 5. Cerrar el carrito
+        UPDATE shopping_carts
+        SET status = 'CERRADO',
+            updated_at = GETDATE()
+        WHERE id = @shopping_cart_id;
 
-UPDATE sales
-SET sales.status = 'PROCESADA',
-sales.updated_at = GETDATE()
-WHERE sales.shopping_cart_id  = @shopping_cart_id;
-
-COMMIT;
-END TRY
-BEGIN CATCH
-IF @@TRANCOUNT > 0 ROLLBACK;
-THROW;
-END CATCH
+        COMMIT;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        THROW;
+    END CATCH
 END;
+
 
 -- Procedimiento 2 -> generar reporte
 
@@ -490,7 +577,8 @@ SET NOCOUNT ON;
 UPDATE ps
 SET ps.quantity = ps.quantity - i.quantity
 FROM product_stocks ps
-INNER JOIN inserted i ON ps.product_id = i.product_id;
+INNER JOIN inserted i ON ps.product_id = i.product_id
+END;
 
 -- Trigger de venta cancelada -> descontar
 
@@ -527,15 +615,69 @@ EXEC SP_ReporteVentasPorFecha
 
 UPDATE sales
 SET status = 'CANCELADA'
-WHERE id = 10002;
+WHERE id = 1;
 
 -- Pruebas vistas --
 
-SELECT * FROM VW_SuscripcionesActivas;
+SELECT * FROM VW_ActiveSuscriptions;
 
-SELECT * FROM VW_ProductosDetalle;
+SELECT * FROM VW_ProductDetails;
 
-SELECT * FROM VW_VentasDetalle;
+SELECT * FROM VW_SalesDetails;
+
+
+-- Truncar todos los datos -- 
+
+EXEC sp_MSforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT all";
+
+
+DELETE FROM sale_items;
+DELETE FROM shopping_carts_items;
+DELETE FROM sales;
+DELETE FROM shopping_carts;
+DELETE FROM subscriptions;
+DELETE FROM customers;
+DELETE FROM users;
+DELETE FROM product_stocks;
+DELETE FROM stores;
+DELETE FROM product_prices;
+DELETE FROM product_attribute_rel;
+DELETE FROM product_attributes;
+DELETE FROM products;
+DELETE FROM product_categories;
+DELETE FROM provinces;
+DELETE FROM countries;
+DELETE FROM user_roles;
+DELETE FROM subscriptions_type;
+
+
+-- 3. Activar nuevamente las restricciones de claves foráneas
+EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all";
+
+
+--- Eliminar todas las tablas --
+
+
+DECLARE @sql NVARCHAR(MAX) = N'';
+
+SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))
+    + '.' + QUOTENAME(OBJECT_NAME(parent_object_id)) 
+    + ' DROP CONSTRAINT ' + QUOTENAME(name) + ';' + CHAR(13) + CHAR(10)
+FROM sys.foreign_keys;
+
+EXEC sp_executesql @sql;
+
+
+-- 2.  destruir (Dropear) todas las tablas
+EXEC sp_MSforeachtable 'DROP TABLE ?';
+
+
+-- 2. Eliminar (Dropear) todas las tablas usando el procedimiento interno
+EXEC sp_MSforeachtable '
+IF OBJECTPROPERTY(OBJECT_ID(''?''), ''TableHasIdentity'') = 1 
+BEGIN 
+    DBCC CHECKIDENT (''?'', RESEED, 0) 
+END';
 
 
 
