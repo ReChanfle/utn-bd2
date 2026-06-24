@@ -1,5 +1,4 @@
 
-
 ----SQL TP----
 CREATE TABLE [products] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
@@ -85,7 +84,6 @@ CREATE TABLE [product_attribute_rel] (
 	PRIMARY KEY([id])
 );
 
-
 CREATE TABLE [product_categories] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
 	[name] NVARCHAR(255) NOT NULL UNIQUE,
@@ -146,16 +144,15 @@ CREATE TABLE [countries] (
 	PRIMARY KEY([id])
 );
 
-
 CREATE TABLE [sales] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
-	[customer_id] BIGINT,
-	[store_id] BIGINT NOT NULL,
-	[status] NVARCHAR(255) NOT NULL,
+	[customer_id] BIGINT NOT NULL,
 	[shopping_cart_id] BIGINT NOT NULL,
-	[total_amount] FLOAT NOT NULL,
+	[store_id] BIGINT NOT NULL,
+	[status] NVARCHAR(255),
+ 	[total_amount] FLOAT NOT NULL,
+ 	[updated_at] DATETIME,
 	[created_at] DATETIME NOT NULL,
-	[updated_at] DATETIME NOT NULL,
 	PRIMARY KEY([id])
 );
 
@@ -169,7 +166,7 @@ CREATE TABLE [user_roles] (
 );
 
 
-CREATE TABLE [subscriptions_types] (
+CREATE TABLE [subscription_types] (
 	[id] BIGINT NOT NULL IDENTITY UNIQUE,
 	[name] NVARCHAR(255) NOT NULL UNIQUE,
 	[code] NVARCHAR(255) NOT NULL UNIQUE,
@@ -199,7 +196,6 @@ CREATE TABLE [shopping_carts_items] (
 	[created_at] DATETIME NOT NULL,
 	PRIMARY KEY([id])
 );
-
 
 -- products → products_categories
 ALTER TABLE [products]
@@ -239,7 +235,7 @@ ADD FOREIGN KEY ([customer_id]) REFERENCES [customers]([id]);
 
 -- subscriptions → subscriptions_type
 ALTER TABLE [subscriptions]
-ADD FOREIGN KEY ([subscription_type_id]) REFERENCES [subscriptions_types]([id]);
+ADD FOREIGN KEY ([subscription_type_id]) REFERENCES [subscription_types]([id]);
 
 -- product_attribute_rel → products
 ALTER TABLE [product_attribute_rel]
@@ -277,6 +273,12 @@ ADD FOREIGN KEY ([country_id]) REFERENCES [countries]([id]);
 ALTER TABLE [sales]
 ADD FOREIGN KEY ([customer_id]) REFERENCES [customers]([id]);
 
+ALTER TABLE [sales]
+ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id]);
+
+ALTER TABLE [shopping_carts]
+ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id])
+
 -- sales → shopping_carts
 ALTER TABLE [sales]
 ADD FOREIGN KEY ([shopping_cart_id]) REFERENCES [shopping_carts]([id]);
@@ -297,122 +299,87 @@ ADD FOREIGN KEY ([shopping_cart_id]) REFERENCES [shopping_carts]([id]);
 ALTER TABLE [shopping_carts_items]
 ADD FOREIGN KEY ([product_id]) REFERENCES [products]([id]);
 
--- Fix fk store id sales -- 
+---- Valores de prueba----
 
-ALTER TABLE [shopping_carts]
-ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id]);
+INSERT INTO [countries] ([name], [code], [created_at]) VALUES 
+('Argentina', 'AR', GETDATE()),
+('México', 'MX', GETDATE());
 
-ALTER TABLE [sales]
-ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id]);
+INSERT INTO [user_roles] ([name], [code], [created_at]) VALUES 
+('Administrador', 'ADMIN', GETDATE()),
+('Vendedor', 'SELLER', GETDATE());
 
-----Valores de prueba----
+INSERT INTO [subscription_types] ([name], [code], [discount_percentage], [created_at]) VALUES 
+('Básica', 'BASIC', 5.0, GETDATE()),
+('Premium', 'PREMIUM', 15.0, GETDATE());
 
---Categorias de producto
+INSERT INTO [product_categories] ([name], [code], [is_active], [created_at], [description]) VALUES 
+('Electrónica', 'ELEC', 1, GETDATE(), 'Artículos tecnológicos y gadgets'),
+('Ropa', 'CLOTH', 1, GETDATE(), 'Indumentaria general');
 
-INSERT INTO product_categories (name, code, is_active, created_at)
-VALUES ('Electrónica', 'ELEC', 1, GETDATE());
+INSERT INTO [product_attributes] ([name], [code], [created_at]) VALUES 
+('Color', 'COLOR', GETDATE()),
+('Tamaño', 'SIZE', GETDATE());
 
--- Producto
+-- 2. Nivel 1
+INSERT INTO [provinces] ([name], [code], [country_id], [created_at]) VALUES 
+('Buenos Aires', 'BUE', 1, GETDATE()),
+('Ciudad de México', 'CDMX', 2, GETDATE());
 
-INSERT INTO products (name, description, category_id, is_active, created_at)
-VALUES ('Mouse Gamer', 'RGB Pro', 1, 1, GETDATE());
+INSERT INTO [products] ([name], [description], [category_id], [is_active], [created_at]) VALUES 
+('Smartphone XYZ', 'Teléfono inteligente de última generación', 1, 1, GETDATE()),
+('Camiseta Algodón', 'Camiseta básica 100% algodón', 2, 1, GETDATE());
 
--- Precio
+INSERT INTO [stores] ([name], [code], [province_id], [country_id], [created_at]) VALUES 
+('Sucursal Central', 'STORE_MAIN', 1, 1, GETDATE()),
+('Sucursal Norte', 'STORE_NORTH', 2, 2, GETDATE());
 
-INSERT INTO product_prices (product_id, price)
-VALUES (1, 1000);
+-- 3. Nivel 2
+INSERT INTO [users] ([role_id], [firstname], [lastname], [email], [username], [password], [is_active], [created_at], [updated_at], [country_id], [province_id]) VALUES 
+(1, 'Juan', 'Pérez', 'admin@tienda.com', 'juan.admin', 'hash_pwd_123', 1, GETDATE(), NULL, 1, 1),
+(2, 'María', 'López', 'vendedor1@tienda.com', 'maria.seller', 'hash_pwd_456', 1, GETDATE(), NULL, 1, 1);
 
+INSERT INTO [customers] ([firstname], [lastname], [email], [username], [password], [document], [country_id], [province_id], [is_active], [suscription_id], [created_at]) VALUES 
+('Carlos', 'Gómez', 'carlos.g@email.com', 'carlosg', 'hash_pwd_789', 11223344, 1, 1, 1, NULL, GETDATE()),
+('Ana', 'Martínez', 'ana.m@email.com', 'anamart', 'hash_pwd_012', 55667788, 2, 2, 1, NULL, GETDATE());
 
--- Pais
+INSERT INTO [product_prices] ([product_id], [price], [sale_price]) VALUES 
+(1, 599.99, 549.99),
+(2, 25.00, NULL);
 
-INSERT INTO [countries] (
-    [name], 
-    [code], 
-    [created_at]
-)
-VALUES (
-    'Argentina', 
-    'AR',        
-    GETDATE()    
-);
-
-
---Provincia
-
-INSERT INTO [provinces] (
-    [name], 
-    [code], 
-    [country_id], 
-    [created_at]
-)
-VALUES (
-    'Buenos Aires', 
-    'BUE',          
-    1,              
-    GETDATE()       
-);
+INSERT INTO [product_attribute_rel] ([product_id], [product_attribute_id]) VALUES 
+(1, 1),
+(2, 2);
 
 
+INSERT INTO [product_stocks] ([product_id], [quantity], [store_id], [created_at], [udated_at]) VALUES 
+(1, 50, 1, GETDATE(), NULL),  -- 50 Smartphones en Sucursal Central (ID 1)
+(2, 150, 2, GETDATE(), NULL); -- 150 Camisetas en Sucursal Norte (ID 2)
 
 
--- Tienda
+INSERT INTO [subscriptions] ([customer_id], [subscription_type_id], [start_at], [end_at], [status]) VALUES 
+(1, 2, GETDATE(), DATEADD(year, 1, GETDATE()), 1),
+(2, 1, GETDATE(), DATEADD(month, 1, GETDATE()), 1);
 
-INSERT INTO [stores] (
-    [name], 
-    [code], 
-    [province_id], 
-    [country_id], 
-    [created_at]
-)
-VALUES (
-    'Sucursal Central', 
-    'SUC-001',          
-    1,                 
-    1,                  
-    GETDATE()         
-);
-
--- Stock inicial 
-
-INSERT INTO product_stocks (product_id, quantity, store_id, created_at)
-VALUES (1, 10, 1, GETDATE());
+UPDATE [customers] SET [suscription_id] = 1 WHERE [id] = 1;
+UPDATE [customers] SET [suscription_id] = 2 WHERE [id] = 2;
 
 
+INSERT INTO [shopping_carts] ([customer_id], [store_id], [status], [created_at], [updated_at], [deleted_at]) VALUES 
+(1, 1, 'ACTIVO', GETDATE(), NULL, NULL),  
+(2, 2, 'CERRADO', GETDATE(), NULL, NULL); 
+
+INSERT INTO [shopping_carts_items] ([shopping_cart_id], [product_id], [quantity], [price_at_time], [created_at]) VALUES 
+(1, 1, 1, 549.99, GETDATE()), -- 1 Smartphone en carrito 1
+(2, 2, 3, 25.00, GETDATE());  -- 3 Camisetas en carrito 2
 
 
--- Cliente
-
-INSERT INTO customers (
-    firstname, lastname, email, username, password,
-    document, country_id, province_id, is_active, created_at
-)
-VALUES (
-    'Juan', 'Perez', 'juan@test.com', 'juan123', '1234',
-    12345678, 1, 1, 1, GETDATE()
-);
-
--- Tipos suscripciones
-
-INSERT INTO subscriptions_types (name, code, discount_percentage, created_at)
-VALUES ('test1suscripcion', 'CODE1', 0.15, GETDATE());
-
--- Suscripciones 
-
-INSERT INTO subscriptions (customer_id, subscription_type_id, start_at, end_at, status)
-VALUES (1, 1, GETDATE(), DATEADD(MONTH, 1, GETDATE()), 1);
+INSERT INTO [sales] ([customer_id], [shopping_cart_id], [store_id], [status], [total_amount], [created_at]) VALUES 
+(2, 2, 2, 'COMPLETED', 75.00, GETDATE());
 
 
--- Carrito
-
-INSERT INTO shopping_carts (customer_id, store_id, status, created_at)
-VALUES (1, 1,'ABIERTO', GETDATE());
-
--- Producots en carrito
-INSERT INTO shopping_carts_items (
-    shopping_cart_id, product_id, quantity, price_at_time, created_at
-)
-VALUES (1, 1, 2, 1000, GETDATE());
-
+INSERT INTO [sale_items] ([sale_id], [product_id], [quantity], [price_at_time], [created_at]) VALUES 
+(1, 2, 3, 25.00, GETDATE());
 
 -- Vista 1 -> detalle de venta
 
@@ -448,7 +415,6 @@ LEFT JOIN product_stocks ps ON p.id = ps.product_id
 GROUP BY
 p.id, p.name, p.description, pc.name, pp.price;
 
-
 -- Vista 3 -> 
 
 CREATE VIEW VW_ActiveSuscriptions AS
@@ -461,16 +427,13 @@ sub.start_at,
 sub.end_at
 FROM subscriptions sub
 INNER JOIN customers c ON sub.customer_id = c.id
-INNER JOIN subscriptions_types st ON sub.subscription_type_id = st.id
+INNER JOIN subscription_types st ON sub.subscription_type_id = st.id
 WHERE sub.status = 1
 AND sub.end_at >= GETDATE();
 
-
-
-
 --Procedimiento 1 -> generar venta
 
-CREATE PROCEDURE SP_GenerarVentaDesdeCarrito
+CREATE PROCEDURE SP_GenerateSaleFromShoppingCart
     @shopping_cart_id BIGINT
 AS
 BEGIN
@@ -544,10 +507,9 @@ BEGIN
     END CATCH
 END;
 
-
 -- Procedimiento 2 -> generar reporte
 
-CREATE PROCEDURE SP_ReporteVentasPorFecha
+CREATE PROCEDURE SP_ReportSalesByDate
 @FechaInicio DATETIME,
 @FechaFin DATETIME
 AS
@@ -567,70 +529,82 @@ END;
 
 -- Trigger de stock -> descontar, se ejecuta despues del insert del procedure de generar ventas en sales_items
 
-CREATE TRIGGER TR_DescontarStockVenta
+CREATE OR ALTER TRIGGER TR_SubtrackStockFromSale
 ON sale_items
 AFTER INSERT
 AS
 BEGIN
-SET NOCOUNT ON;
+    SET NOCOUNT ON;
 
-UPDATE ps
-SET ps.quantity = ps.quantity - i.quantity
-FROM product_stocks ps
-INNER JOIN inserted i ON ps.product_id = i.product_id
+    UPDATE ps
+    SET ps.quantity = ps.quantity - i.quantity
+    FROM product_stocks ps
+    INNER JOIN inserted i ON ps.product_id = i.product_id
+    INNER JOIN sales s ON i.sale_id = s.id 
+    WHERE ps.store_id = s.store_id;
 END;
 
--- Trigger de venta cancelada -> descontar
+-- Trigger de venta cancelada -> sumar
 
-CREATE TRIGGER TR_RestaurarStockVentaCancelada
+CREATE OR ALTER TRIGGER TR_ReStockAferCanceledSale
 ON sales
 AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    UPDATE ps
-    SET ps.quantity = ps.quantity + si.quantity
-    FROM product_stocks ps
-    INNER JOIN sale_items si ON ps.product_id = si.product_id
-    INNER JOIN inserted i ON si.sale_id = i.id
-    INNER JOIN deleted d ON i.id = d.id
-    WHERE i.status = 'CANCELADA'
-      AND d.status <> 'CANCELADA';
+    IF UPDATE(status)
+    BEGIN
+        -- Agrupamos las cantidades a devolver por producto y sucursal
+        WITH StockADevolver AS (
+            SELECT 
+                si.product_id,
+                i.store_id,
+                SUM(si.quantity) as TotalQuantityToRestore
+            FROM inserted i
+            INNER JOIN deleted d ON i.id = d.id
+            INNER JOIN sale_items si ON i.id = si.sale_id
+            WHERE i.status = 'CANCELED' AND d.status <> 'CANCELED'
+            GROUP BY si.product_id, i.store_id
+        )
+        -- Actualizamos el stock
+        UPDATE ps
+        SET ps.quantity = ps.quantity + sad.TotalQuantityToRestore
+        FROM product_stocks ps
+        INNER JOIN StockADevolver sad 
+            ON ps.product_id = sad.product_id 
+            AND ps.store_id = sad.store_id; 
+    END
 END;
-
-
 ---Prueba store procedure crear venta----
 
-EXEC SP_GenerarVentaDesdeCarrito 1;
+EXEC SP_GenerateSaleFromShoppingCart 1;
 
 ---Prueba store procedure generar reporte----
 
-EXEC SP_ReporteVentasPorFecha 
+EXEC SP_ReportSalesByDate 
     @FechaInicio = '2026-01-01',
     @FechaFin = '2026-12-31';
-
 
 ----Prueba trigger anulacion de venta----
 
 UPDATE sales
-SET status = 'CANCELADA'
-WHERE id = 1;
+SET status = 'CANCELED'
+WHERE id = 2;
 
 -- Pruebas vistas --
 
-SELECT * FROM VW_ActiveSuscriptions;
+SELECT * FROM VW_SalesDetails;
 
 SELECT * FROM VW_ProductDetails;
 
-SELECT * FROM VW_SalesDetails;
+SELECT * FROM VW_ActiveSuscriptions;
 
 
--- Truncar todos los datos -- 
-
+-- 1. Desactivar todas las restricciones de claves foráneas
 EXEC sp_MSforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT all";
 
-
+-- 2. Borrar los datos de todas las tablas
 DELETE FROM sale_items;
 DELETE FROM shopping_carts_items;
 DELETE FROM sales;
@@ -648,16 +622,12 @@ DELETE FROM product_categories;
 DELETE FROM provinces;
 DELETE FROM countries;
 DELETE FROM user_roles;
-DELETE FROM subscriptions_type;
-
+DELETE FROM subscriptions_types;
 
 -- 3. Activar nuevamente las restricciones de claves foráneas
 EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all";
 
-
---- Eliminar todas las tablas --
-
-
+-- 1. Eliminar todas las relaciones (Claves Foráneas) de la base de datos
 DECLARE @sql NVARCHAR(MAX) = N'';
 
 SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))
@@ -667,17 +637,21 @@ FROM sys.foreign_keys;
 
 EXEC sp_executesql @sql;
 
-
--- 2.  destruir (Dropear) todas las tablas
+-- 2. Eliminar (Dropear) todas las tablas usando el procedimiento interno
 EXEC sp_MSforeachtable 'DROP TABLE ?';
 
+-- Drop SP, Triggers y Views ----
 
--- 2. Eliminar (Dropear) todas las tablas usando el procedimiento interno
-EXEC sp_MSforeachtable '
-IF OBJECTPROPERTY(OBJECT_ID(''?''), ''TableHasIdentity'') = 1 
-BEGIN 
-    DBCC CHECKIDENT (''?'', RESEED, 0) 
-END';
+DROP PROCEDURE IF EXISTS  SP_GenerateSaleFromShoppingCart;
+DROP PROCEDURE IF EXISTS  SP_ReportSalesByDate;
+
+DROP TRIGGER IF EXISTS TR_SubtrackStockFromSale;
+DROP TRIGGER IF EXISTS TR_ReStockAferCanceledSale;
+ 
+DROP VIEW IF EXISTS VW_SalesDetails;
+DROP VIEW IF EXISTS VW_ProductDetails;
+DROP VIEW IF EXISTS VW_ActiveSuscriptions;
+ 
 
 
 
