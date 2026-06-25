@@ -273,9 +273,11 @@ ADD FOREIGN KEY ([country_id]) REFERENCES [countries]([id]);
 ALTER TABLE [sales]
 ADD FOREIGN KEY ([customer_id]) REFERENCES [customers]([id]);
 
+-- sales → stores
 ALTER TABLE [sales]
 ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id]);
 
+-- shopping_carts → stores
 ALTER TABLE [shopping_carts]
 ADD FOREIGN KEY ([store_id]) REFERENCES [stores]([id])
 
@@ -299,7 +301,9 @@ ADD FOREIGN KEY ([shopping_cart_id]) REFERENCES [shopping_carts]([id]);
 ALTER TABLE [shopping_carts_items]
 ADD FOREIGN KEY ([product_id]) REFERENCES [products]([id]);
 
+
 ---- Valores de prueba----
+
 
 INSERT INTO [countries] ([name], [code], [created_at]) VALUES 
 ('Argentina', 'AR', GETDATE()),
@@ -321,7 +325,7 @@ INSERT INTO [product_attributes] ([name], [code], [created_at]) VALUES
 ('Color', 'COLOR', GETDATE()),
 ('Tamaño', 'SIZE', GETDATE());
 
--- 2. Nivel 1
+
 INSERT INTO [provinces] ([name], [code], [country_id], [created_at]) VALUES 
 ('Buenos Aires', 'BUE', 1, GETDATE()),
 ('Ciudad de México', 'CDMX', 2, GETDATE());
@@ -334,7 +338,7 @@ INSERT INTO [stores] ([name], [code], [province_id], [country_id], [created_at])
 ('Sucursal Central', 'STORE_MAIN', 1, 1, GETDATE()),
 ('Sucursal Norte', 'STORE_NORTH', 2, 2, GETDATE());
 
--- 3. Nivel 2
+
 INSERT INTO [users] ([role_id], [firstname], [lastname], [email], [username], [password], [is_active], [created_at], [updated_at], [country_id], [province_id]) VALUES 
 (1, 'Juan', 'Pérez', 'admin@tienda.com', 'juan.admin', 'hash_pwd_123', 1, GETDATE(), NULL, 1, 1),
 (2, 'María', 'López', 'vendedor1@tienda.com', 'maria.seller', 'hash_pwd_456', 1, GETDATE(), NULL, 1, 1);
@@ -415,6 +419,7 @@ LEFT JOIN product_stocks ps ON p.id = ps.product_id
 GROUP BY
 p.id, p.name, p.description, pc.name, pp.price;
 
+
 -- Vista 3 -> 
 
 CREATE VIEW VW_ActiveSuscriptions AS
@@ -430,6 +435,9 @@ INNER JOIN customers c ON sub.customer_id = c.id
 INNER JOIN subscription_types st ON sub.subscription_type_id = st.id
 WHERE sub.status = 1
 AND sub.end_at >= GETDATE();
+
+
+
 
 --Procedimiento 1 -> generar venta
 
@@ -506,6 +514,8 @@ BEGIN
         THROW;
     END CATCH
 END;
+
+
 
 -- Procedimiento 2 -> generar reporte
 
@@ -586,6 +596,7 @@ EXEC SP_ReportSalesByDate
     @FechaInicio = '2026-01-01',
     @FechaFin = '2026-12-31';
 
+
 ----Prueba trigger anulacion de venta----
 
 UPDATE sales
@@ -622,7 +633,7 @@ DELETE FROM product_categories;
 DELETE FROM provinces;
 DELETE FROM countries;
 DELETE FROM user_roles;
-DELETE FROM subscriptions_types;
+DELETE FROM subscription_types;
 
 -- 3. Activar nuevamente las restricciones de claves foráneas
 EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all";
@@ -637,11 +648,11 @@ FROM sys.foreign_keys;
 
 EXEC sp_executesql @sql;
 
+
 -- 2. Eliminar (Dropear) todas las tablas usando el procedimiento interno
 EXEC sp_MSforeachtable 'DROP TABLE ?';
 
--- Drop SP, Triggers y Views ----
-
+-- Dropear sp, triggers y views
 DROP PROCEDURE IF EXISTS  SP_GenerateSaleFromShoppingCart;
 DROP PROCEDURE IF EXISTS  SP_ReportSalesByDate;
 
