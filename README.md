@@ -1,4 +1,3 @@
-Aquí tienes un README.md estructurado y claro, ideal para subir a tu repositorio de GitHub.
 
 E-Commerce Database Schema
 Este repositorio contiene un script SQL completo para la creación y gestión de una base de datos relacional orientada a un sistema de comercio electrónico (E-Commerce) y gestión de ventas en sucursales.
