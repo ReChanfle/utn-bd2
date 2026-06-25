@@ -1,6 +1,6 @@
 
-E-Commerce Database Schema
-Este repositorio contiene un script SQL completo para la creación y gestión de una base de datos relacional orientada a un sistema de comercio electrónico (E-Commerce) y gestión de ventas en sucursales.
+## E-Commerce Database Schema
+este repositorio contiene un script SQL completo para la creación y gestión de una base de datos relacional orientada a un sistema de comercio electrónico (E-Commerce) y gestión de ventas en sucursales.
 
 El script está escrito en T-SQL (compatible con Microsoft SQL Server) e incluye la creación de tablas, relaciones, datos de prueba, vistas, procedimientos almacenados, triggers y scripts de limpieza.
 
